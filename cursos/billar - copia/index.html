@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billar en Three.js</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // Configuración inicial de la escena, cámara y renderizador
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Mesa de billar
+        const tableWidth = 10;
+        const tableHeight = 5;
+        const tableGeometry = new THREE.BoxGeometry(tableWidth, 0.5, tableHeight);
+        const tableMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const table = new THREE.Mesh(tableGeometry, tableMaterial);
+        scene.add(table);
+
+        // Crear la bola de billar
+        const ballGeometry = new THREE.SphereGeometry(0.2, 32, 32);
+
+        function createBall(color, x, z) {
+            const ballMaterial = new THREE.MeshBasicMaterial({ color: color });
+            const ballMesh = new THREE.Mesh(ballGeometry, ballMaterial);
+            ballMesh.position.set(x, 0.25, z); // Altura sobre la mesa
+            return {
+                mesh: ballMesh,
+                position: new THREE.Vector3(x, 0.25, z),
+                velocity: new THREE.Vector3(5+x, 0, 5+z),
+                radius: 0.2,
+                mass: 1,
+                friction: 0.9999
+            };
+        }
+
+        // Crear dos bolas como ejemplo
+        const balls = [
+            createBall(0xffffff, -1, 0), // Bola blanca
+            createBall(0xffffff, -2, 1),
+            createBall(0xffffff, -3, 2),
+            createBall(0xffffff, 1, 0),
+            createBall(0xff0000, 2, 0)   // Bola roja
+        ];
+
+        balls.forEach(ball => scene.add(ball.mesh));
+
+        // Configuración de la cámara
+        camera.position.set(0, 10, 10);
+        camera.lookAt(0, 0, 0);
+
+        // Función para actualizar la posición y velocidad de las bolas
+        function updateBall(ball, deltaTime) {
+            // Aplicar fricción
+            ball.velocity.multiplyScalar(ball.friction);
+
+            // Actualizar la posición de la bola
+            ball.position.add(ball.velocity.clone().multiplyScalar(deltaTime));
+
+            // Mover la malla a la nueva posición
+            ball.mesh.position.copy(ball.position);
+
+            // Detener la bola si su velocidad es muy baja
+            if (ball.velocity.length() < 0.01) {
+                ball.velocity.set(0, 0, 0);
+            }
+        }
+
+        // Colisiones con las bandas de la mesa
+        function checkCollisionWithWalls(ball) {
+            if (Math.abs(ball.position.x) + ball.radius > tableWidth / 2) {
+                ball.velocity.x *= -1; // Invertir la velocidad en X
+            }
+            if (Math.abs(ball.position.z) + ball.radius > tableHeight / 2) {
+                ball.velocity.z *= -1; // Invertir la velocidad en Z
+            }
+        }
+
+        // Colisiones entre bolas
+        function checkCollisionBetweenBalls(ball1, ball2) {
+            const distance = ball1.position.distanceTo(ball2.position);
+            if (distance < ball1.radius + ball2.radius) {
+                // Dirección de la colisión
+                const collisionNormal = ball1.position.clone().sub(ball2.position).normalize();
+                const relativeVelocity = ball1.velocity.clone().sub(ball2.velocity);
+                const velocityAlongNormal = relativeVelocity.dot(collisionNormal);
+
+                if (velocityAlongNormal > 0) return;
+
+                // Impulso
+                const restitution = 1; // Colisión elástica
+                const impulse = (-(1 + restitution) * velocityAlongNormal) / (ball1.mass + ball2.mass);
+
+                // Ajustar las velocidades
+                ball1.velocity.add(collisionNormal.clone().multiplyScalar(impulse * ball2.mass));
+                ball2.velocity.sub(collisionNormal.clone().multiplyScalar(impulse * ball1.mass));
+            }
+        }
+
+        // Bucle de animación
+        function animate() {
+            requestAnimationFrame(animate);
+            const deltaTime = 0.016; // Aproximadamente 60 FPS
+
+            // Actualizar la física de cada bola
+            balls.forEach(ball => {
+                updateBall(ball, deltaTime);
+                checkCollisionWithWalls(ball);
+            });
+
+            // Verificar colisiones entre bolas
+            for (let i = 0; i < balls.length; i++) {
+                for (let j = i + 1; j < balls.length; j++) {
+                    checkCollisionBetweenBalls(balls[i], balls[j]);
+                }
+            }
+
+            // Renderizar la escena
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

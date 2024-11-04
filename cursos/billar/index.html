@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billar en Three.js</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
+
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize( window.innerWidth, window.innerHeight );
+renderer.setAnimationLoop( animate );
+document.body.appendChild( renderer.domElement );
+camera.position.z = 5;
+camera.position.y = 5;
+camera.lookAt(0,0,0)
+
+
+///////////////////////////////////
+const mesaW=10;
+const mesaH=5;
+const deltaTiempo=0.05;
+const restitucion=1;
+/////////////////////////////////////////////
+const geometry = new THREE.BoxGeometry( mesaW, 0.05, mesaH );
+const material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+const cube = new THREE.Mesh( geometry, material );
+scene.add( cube );
+////////////////////////
+function crearBall(x,z,rad,vx,vz,m)
+{
+    const geometryB = new THREE.SphereGeometry( rad, 15, 15 ); 
+    const materialB = new THREE.MeshBasicMaterial( { color: 0xffff00 } ); 
+    const ball = new THREE.Mesh( geometryB, materialB ); 
+    ball.position.set(x,0,z)
+    scene.add( ball );
+    const objeto={
+        Mesh:ball,
+        position : new THREE.Vector3(x,0,z),
+        velocity: new THREE.Vector3(vx,0,vz),
+        mass:m,
+        radius:rad,
+        firction:0.994
+    }
+    return objeto;
+}
+const Balls=
+[
+    crearBall(1,1,0.5,1,1,1),
+    crearBall(-1,1,0.5,1,1,1),
+    crearBall(1,-1,0.5,1,1,1),
+    crearBall(-1,-1,0.5,1,1,2)
+]
+function updateBall(ball)
+{
+    ball.velocity.multiplyScalar(ball.firction);
+    ball.position.add(ball.velocity.clone().multiplyScalar(deltaTiempo))
+    ball.Mesh.position.copy(ball.position)
+    if(ball.velocity.length()<0.1)
+    {
+        ball.velocity.set(0,0,0)
+    }
+}
+function colisionBorde(ball)
+{
+    if(Math.abs(ball.position.x)>mesaW/2)
+    {
+        ball.velocity.x*=-1
+    }
+    if(Math.abs(ball.position.z)>mesaH/2)
+    {
+        ball.velocity.z*=-1
+    }
+}
+function colisionBalss(ball1,ball2)
+{
+    const distancia=ball1.position.distanceTo(ball2.position)
+    if(distancia<ball1.radius+ball2.radius)
+    {
+        const normalVector=ball1.position.clone().sub(ball2.position).normalize();
+        const relativeVector=ball1.velocity.clone().sub(ball2.velocity);
+        const relativeProjec=relativeVector.clone().dot(normalVector);
+        if(relativeProjec>0)
+        {
+            return
+        }
+        const impulse=-((1+restitucion)*relativeProjec)/(ball1.mass+ball2.mass)
+        ball1.velocity.add(normalVector.clone().multiplyScalar(impulse*ball1.mass))
+        ball2.velocity.sub(normalVector.clone().multiplyScalar(impulse*ball2.mass))
+
+
+
+    }
+}
+
+
+
+
+
+function animate() {
+
+    Balls.forEach(element => {
+        updateBall(element);
+        colisionBorde(element);
+    });
+    for(i=0;i<Balls.length;i++)
+    {
+        for(j=i+1;j<Balls.length;j++)
+            {
+                colisionBalss(Balls[i],Balls[j])
+            }  
+    }
+	renderer.render( scene, camera );
+
+}
+    </script>
+</body>
+</html>
